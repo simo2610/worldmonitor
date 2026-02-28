@@ -60,6 +60,8 @@ import { t } from '@/services/i18n';
 import { getCurrentTheme } from '@/utils';
 import { trackCriticalBannerAction } from '@/services/analytics';
 
+const TECH_ONLY_UI = import.meta.env.VITE_TECH_ONLY_UI === '1' && SITE_VARIANT === 'tech';
+
 export interface PanelLayoutCallbacks {
   openCountryStory: (code: string, name: string) => void;
   loadAllData: () => Promise<void>;
@@ -110,6 +112,16 @@ export class PanelLayoutManager implements AppModule {
       <div class="header">
         <div class="header-left">
           <div class="variant-switcher">${(() => {
+            if (TECH_ONLY_UI) {
+              return `
+              <a href="#"
+                 class="variant-option active"
+                 data-variant="tech"
+                 title="${t('header.tech')} ${t('common.currentVariant')}">
+                <span class="variant-icon">💻</span>
+                <span class="variant-label">${t('header.tech')}</span>
+              </a>`;
+            }
             const local = this.ctx.isDesktopApp || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
             const vHref = (v: string, prod: string) => local || SITE_VARIANT === v ? '#' : prod;
             const vTarget = (v: string) => !local && SITE_VARIANT !== v ? 'target="_blank" rel="noopener"' : '';

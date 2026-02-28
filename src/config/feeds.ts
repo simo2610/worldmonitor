@@ -685,6 +685,10 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'TechMeme', url: rss('https://www.techmeme.com/feed.xml') },
     { name: 'Engadget', url: rss('https://www.engadget.com/rss.xml') },
     { name: 'Fast Company', url: rss('https://feeds.feedburner.com/fastcompany/headlines') },
+    { name: 'Wired Italia', url: rss('https://news.google.com/rss/search?q=site:wired.it+tecnologia+OR+startup+when:7d&hl=it&gl=IT&ceid=IT:it') },
+    { name: 'Agenda Digitale', url: rss('https://news.google.com/rss/search?q=site:agendadigitale.eu+innovazione+OR+AI+when:7d&hl=it&gl=IT&ceid=IT:it') },
+    { name: 'Il Sole 24 Ore Tech', url: rss('https://news.google.com/rss/search?q=site:ilsole24ore.com+tecnologia+OR+innovazione+when:7d&hl=it&gl=IT&ceid=IT:it') },
+    { name: 'Google Tech Italia', url: rss('https://news.google.com/rss/search?q=(startup+OR+intelligenza+artificiale+OR+cloud)+Italia+tecnologia+when:3d&hl=it&gl=IT&ceid=IT:it') },
   ],
   ai: [
     { name: 'AI News', url: rss('https://news.google.com/rss/search?q=(OpenAI+OR+Anthropic+OR+Google+AI+OR+"large+language+model"+OR+ChatGPT+OR+Claude+OR+"AI+model")+when:2d&hl=en-US&gl=US&ceid=US:en') },
@@ -709,6 +713,9 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'Fortune Term Sheet', url: rss('https://news.google.com/rss/search?q="Term+Sheet"+venture+capital+OR+startup+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'PitchBook News', url: rss('https://news.google.com/rss/search?q=site:pitchbook.com+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'CB Insights', url: rss('https://www.cbinsights.com/research/feed/') },
+    { name: 'StartupItalia', url: rss('https://news.google.com/rss/search?q=site:startupitalia.eu+startup+OR+funding+when:7d&hl=it&gl=IT&ceid=IT:it') },
+    { name: 'EconomyUp', url: rss('https://news.google.com/rss/search?q=site:economyup.it+startup+OR+innovazione+when:7d&hl=it&gl=IT&ceid=IT:it') },
+    { name: 'Italian Startup Funding', url: rss('https://news.google.com/rss/search?q=(startup+italiane+OR+round+di+finanziamento+OR+venture+capital)+when:7d&hl=it&gl=IT&ceid=IT:it') },
   ],
   vcblogs: [
     { name: 'Y Combinator Blog', url: rss('https://www.ycombinator.com/blog/rss/') },
@@ -766,6 +773,8 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     // Middle East
     { name: 'MENA Startups', url: rss('https://news.google.com/rss/search?q=(MENA+startup+OR+"Middle+East"+funding+OR+Gulf+startup)+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'MENA Tech News', url: rss('https://news.google.com/rss/search?q=(UAE+startup+OR+Saudi+tech+OR+Dubai+startup+OR+NEOM+tech)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    // Italy
+    { name: 'Italia Startup Ecosystem', url: rss('https://news.google.com/rss/search?q=(startup+Italia+OR+innovazione+digitale+Italia+OR+acceleratori+startup+Italia)+when:7d&hl=it&gl=IT&ceid=IT:it') },
   ],
   github: [
     { name: 'GitHub Blog', url: rss('https://github.blog/feed/') },
