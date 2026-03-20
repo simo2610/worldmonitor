@@ -483,6 +483,27 @@ export interface PanelConfig {
   priority?: number;
 }
 
+export type StartupDealflowStatus = 'dealflow' | 'portfolio';
+export type StartupDealflowStage = 'pre-seed' | 'seed' | 'series-a' | 'series-b+' | 'growth';
+
+export interface StartupDealflowItem {
+  id: string;
+  name: string;
+  city: string;
+  region: string;
+  country: string;
+  lat: number;
+  lon: number;
+  status: StartupDealflowStatus;
+  stage: StartupDealflowStage;
+  sectors: string[];
+  website?: string;
+  aliases?: string[];
+  newsQuery?: string;
+  newsExclusions?: string[];
+  lastUpdated?: string;
+}
+
 export interface MapLayers {
   conflicts: boolean;
   bases: boolean;
@@ -515,6 +536,10 @@ export interface MapLayers {
   cloudRegions: boolean;
   accelerators: boolean;
   techHQs: boolean;
+  researchUniversities: boolean;
+  researchCenters: boolean;
+  startupDealflow: boolean;
+  portfolioStartups: boolean;
   techEvents: boolean;
   // Finance variant layers
   stockExchanges: boolean;

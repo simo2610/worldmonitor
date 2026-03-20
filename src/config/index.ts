@@ -83,6 +83,7 @@ export {
 export { TECH_COMPANIES } from './tech-companies';
 export { AI_RESEARCH_LABS } from './ai-research-labs';
 export { STARTUP_ECOSYSTEMS } from './startup-ecosystems';
+export { STARTUP_DEALFLOW_SEED, getStartupDealflowSeedStats } from './startup-dealflow';
 export {
   AI_REGULATIONS,
   REGULATORY_ACTIONS,

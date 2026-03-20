@@ -26,6 +26,7 @@ interface PreparedCluster {
 export class NewsPanel extends Panel {
   private clusteredMode = true;
   private deviationEl: HTMLElement | null = null;
+  private contextBadgeEl: HTMLElement | null = null;
   private relatedAssetContext = new Map<string, RelatedAssetContext>();
   private onRelatedAssetClick?: (asset: RelatedAsset) => void;
   private onRelatedAssetsFocus?: (assets: RelatedAsset[], originLabel: string) => void;
@@ -47,6 +48,7 @@ export class NewsPanel extends Panel {
   constructor(id: string, title: string) {
     super({ id, title, showCount: true, trackActivity: true });
     this.createDeviationIndicator();
+    this.createContextBadge();
     this.createSummarizeButton();
     this.setupActivityTracking();
     this.initWindowedList();
@@ -132,6 +134,29 @@ export class NewsPanel extends Panel {
     } else {
       this.header.appendChild(this.summaryBtn);
     }
+  }
+
+  private createContextBadge(): void {
+    const header = this.getElement().querySelector('.panel-header-left');
+    if (!header) return;
+    this.contextBadgeEl = document.createElement('span');
+    this.contextBadgeEl.className = 'panel-context-badge neutral';
+    this.contextBadgeEl.style.display = 'none';
+    header.appendChild(this.contextBadgeEl);
+  }
+
+  public setContextBadge(text: string, tone: 'neutral' | 'good' | 'warn' = 'neutral'): void {
+    if (!this.contextBadgeEl) return;
+    this.contextBadgeEl.textContent = text;
+    this.contextBadgeEl.className = `panel-context-badge ${tone}`;
+    this.contextBadgeEl.style.display = 'inline-flex';
+  }
+
+  public clearContextBadge(): void {
+    if (!this.contextBadgeEl) return;
+    this.contextBadgeEl.textContent = '';
+    this.contextBadgeEl.style.display = 'none';
+    this.contextBadgeEl.className = 'panel-context-badge neutral';
   }
 
   private async handleSummarize(): Promise<void> {

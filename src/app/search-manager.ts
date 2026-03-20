@@ -1,6 +1,6 @@
 import type { AppContext, AppModule } from '@/app/app-context';
 import type { SearchResult } from '@/components/SearchModal';
-import type { NewsItem, MapLayers } from '@/types';
+import type { NewsItem, MapLayers, StartupDealflowItem } from '@/types';
 import type { MapView } from '@/components';
 import type { Command } from '@/config/commands';
 import { SearchModal } from '@/components';
@@ -16,8 +16,14 @@ import { GAMMA_IRRADIATORS } from '@/config/irradiators';
 import { TECH_COMPANIES } from '@/config/tech-companies';
 import { AI_RESEARCH_LABS } from '@/config/ai-research-labs';
 import { STARTUP_ECOSYSTEMS } from '@/config/startup-ecosystems';
+import { getStartupDealflowItems, loadStartupDealflowItems } from '@/services/startup-dealflow';
 import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
 import { STOCK_EXCHANGES, FINANCIAL_CENTERS, CENTRAL_BANKS, COMMODITY_HUBS } from '@/config/finance-geo';
+import {
+  getItalyResearchCenters,
+  loadItalyResearchCenters,
+} from '@/services/italy-research-centers';
+import type { ItalyResearchCenter } from '@/config/it-research-centers';
 import { trackSearchResultSelected, trackCountrySelected } from '@/services/analytics';
 import { t } from '@/services/i18n';
 import { saveToStorage, setTheme } from '@/utils';
@@ -73,6 +79,24 @@ export class SearchManager implements AppModule {
     if (SITE_VARIANT === 'happy') {
       // Happy variant: no geopolitical/military/infrastructure sources
     } else if (SITE_VARIANT === 'tech') {
+      const buildAiLabItems = (centers: ItalyResearchCenter[]) => {
+        const researchCenters = centers.map((center) => ({
+          id: center.id,
+          title: center.name,
+          subtitle: `${center.type} ${center.city} ${center.region} ${center.focus.join(' ')}`.trim(),
+          data: center,
+        }));
+        return [
+          ...AI_RESEARCH_LABS.map(l => ({
+            id: l.id,
+            title: l.name,
+            subtitle: `${l.type} ${l.city} ${l.focusAreas?.join(' ') || ''}`.trim(),
+            data: l,
+          })),
+          ...researchCenters,
+        ];
+      };
+
       this.ctx.searchModal.registerSource('techcompany', TECH_COMPANIES.map(c => ({
         id: c.id,
         title: c.name,
@@ -80,12 +104,10 @@ export class SearchManager implements AppModule {
         data: c,
       })));
 
-      this.ctx.searchModal.registerSource('ailab', AI_RESEARCH_LABS.map(l => ({
-        id: l.id,
-        title: l.name,
-        subtitle: `${l.type} ${l.city} ${l.focusAreas?.join(' ') || ''}`.trim(),
-        data: l,
-      })));
+      this.ctx.searchModal.registerSource('ailab', buildAiLabItems(getItalyResearchCenters()));
+      void loadItalyResearchCenters().then((centers) => {
+        this.ctx.searchModal?.registerSource('ailab', buildAiLabItems(centers));
+      });
 
       this.ctx.searchModal.registerSource('startup', STARTUP_ECOSYSTEMS.map(s => ({
         id: s.id,
@@ -121,6 +143,24 @@ export class SearchManager implements AppModule {
         subtitle: `${a.type} • ${a.city}, ${a.country}${a.notable ? ` • ${a.notable.slice(0, 2).join(', ')}` : ''}`,
         data: a,
       })));
+
+      const buildStartupItems = (items: StartupDealflowItem[], status: StartupDealflowItem['status']) =>
+        items
+          .filter((item) => item.status === status)
+          .map((item) => ({
+            id: item.id,
+            title: item.name,
+            subtitle: `${item.status} • ${item.stage} • ${item.city}, ${item.country} • ${item.sectors.slice(0, 2).join(', ')}`.trim(),
+            data: item,
+          }));
+
+      const startupItems = getStartupDealflowItems();
+      this.ctx.searchModal.registerSource('startupDealflow', buildStartupItems(startupItems, 'dealflow'));
+      this.ctx.searchModal.registerSource('portfolioStartup', buildStartupItems(startupItems, 'portfolio'));
+      void loadStartupDealflowItems().then((items) => {
+        this.ctx.searchModal?.registerSource('startupDealflow', buildStartupItems(items, 'dealflow'));
+        this.ctx.searchModal?.registerSource('portfolioStartup', buildStartupItems(items, 'portfolio'));
+      });
     } else {
       this.ctx.searchModal.registerSource('hotspot', INTEL_HOTSPOTS.map(h => ({
         id: h.id,
@@ -317,9 +357,16 @@ export class SearchManager implements AppModule {
         break;
       }
       case 'ailab': {
-        const lab = result.data as typeof AI_RESEARCH_LABS[0];
-        this.ctx.map?.setView('global');
-        setTimeout(() => { this.ctx.map?.setCenter(lab.lat, lab.lon, 4); }, 300);
+        const item = result.data as (typeof AI_RESEARCH_LABS[0] | ItalyResearchCenter);
+        const isItalianCenter = 'region' in item && item.country.toLowerCase() === 'italy';
+        this.ctx.map?.setView(isItalianCenter ? 'italy' : 'global');
+        if (isItalianCenter) {
+          const italyCenter = item as ItalyResearchCenter;
+          const targetLayer: keyof MapLayers = italyCenter.type === 'university' ? 'researchUniversities' : 'researchCenters';
+          this.ctx.map?.enableLayer(targetLayer);
+          this.ctx.mapLayers[targetLayer] = true;
+        }
+        setTimeout(() => { this.ctx.map?.setCenter(item.lat, item.lon, isItalianCenter ? 7 : 4); }, 300);
         break;
       }
       case 'startup': {
@@ -328,6 +375,22 @@ export class SearchManager implements AppModule {
         this.ctx.map?.enableLayer('startupHubs');
         this.ctx.mapLayers.startupHubs = true;
         setTimeout(() => { this.ctx.map?.setCenter(ecosystem.lat, ecosystem.lon, 4); }, 300);
+        break;
+      }
+      case 'startupDealflow':
+      case 'portfolioStartup': {
+        const startup = result.data as StartupDealflowItem;
+        document.dispatchEvent(new CustomEvent('workspace:switch', { detail: { workspace: 'startup' } }));
+        const isItaly = startup.country.toLowerCase() === 'italy';
+        this.ctx.map?.setView(isItaly ? 'italy' : 'eu');
+        if (startup.status === 'portfolio') {
+          this.ctx.map?.enableLayer('portfolioStartups');
+          this.ctx.mapLayers.portfolioStartups = true;
+        } else {
+          this.ctx.map?.enableLayer('startupDealflow');
+          this.ctx.mapLayers.startupDealflow = true;
+        }
+        setTimeout(() => { this.ctx.map?.setCenter(startup.lat, startup.lon, isItaly ? 7 : 5.2); }, 300);
         break;
       }
       case 'techevent':

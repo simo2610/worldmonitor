@@ -1,9 +1,10 @@
-import type { ConflictZone, Hotspot, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent, Port, Spaceport, CriticalMineralProject, CyberThreat } from '@/types';
+import type { ConflictZone, Hotspot, NewsItem, MilitaryBase, StrategicWaterway, APTGroup, NuclearFacility, EconomicCenter, GammaIrradiator, Pipeline, UnderseaCable, CableAdvisory, RepairShip, InternetOutage, AIDataCenter, AisDisruptionEvent, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent, Port, Spaceport, CriticalMineralProject, CyberThreat, StartupDealflowItem } from '@/types';
 import type { AirportDelayAlert } from '@/services/aviation';
 import type { Earthquake } from '@/services/earthquakes';
 import type { WeatherAlert } from '@/services/weather';
 import { UNDERSEA_CABLES } from '@/config';
 import type { StartupHub, Accelerator, TechHQ, CloudRegion } from '@/config/tech-geo';
+import type { ItalyResearchCenter } from '@/config/it-research-centers';
 import type { TechHubActivity } from '@/services/tech-activity';
 import type { GeoHubActivity } from '@/services/geo-activity';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
@@ -14,7 +15,7 @@ import { getNaturalEventIcon } from '@/services/eonet';
 import { getHotspotEscalation, getEscalationChange24h } from '@/services/hotspot-escalation';
 import { getCableHealthRecord } from '@/services/cable-health';
 
-export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'cyberThreat' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'datacenterCluster' | 'ais' | 'protest' | 'protestCluster' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent' | 'techHQCluster' | 'techEventCluster' | 'techActivity' | 'geoActivity' | 'stockExchange' | 'financialCenter' | 'centralBank' | 'commodityHub';
+export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'cyberThreat' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'datacenterCluster' | 'ais' | 'protest' | 'protestCluster' | 'flight' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'startupDealflow' | 'portfolioStartup' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'researchCenter' | 'techEvent' | 'techHQCluster' | 'techEventCluster' | 'techActivity' | 'geoActivity' | 'stockExchange' | 'financialCenter' | 'centralBank' | 'commodityHub';
 
 interface TechEventPopupData {
   id: string;
@@ -120,7 +121,7 @@ interface DatacenterClusterData {
 
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | CyberThreat | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData | ProtestClusterData | DatacenterClusterData | TechHubActivity | GeoHubActivity | StockExchangePopupData | FinancialCenterPopupData | CentralBankPopupData | CommodityHubPopupData;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | CyberThreat | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | StartupDealflowItem | CloudRegion | TechHQ | Accelerator | ItalyResearchCenter | TechEventPopupData | TechHQClusterData | TechEventClusterData | ProtestClusterData | DatacenterClusterData | TechHubActivity | GeoHubActivity | StockExchangePopupData | FinancialCenterPopupData | CentralBankPopupData | CommodityHubPopupData;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -408,12 +409,17 @@ export class MapPopup {
         return this.renderMineralPopup(data.data as CriticalMineralProject);
       case 'startupHub':
         return this.renderStartupHubPopup(data.data as StartupHub);
+      case 'startupDealflow':
+      case 'portfolioStartup':
+        return this.renderStartupDealflowPopup(data.data as StartupDealflowItem);
       case 'cloudRegion':
         return this.renderCloudRegionPopup(data.data as CloudRegion);
       case 'techHQ':
         return this.renderTechHQPopup(data.data as TechHQ);
       case 'accelerator':
         return this.renderAcceleratorPopup(data.data as Accelerator);
+      case 'researchCenter':
+        return this.renderResearchCenterPopup(data.data as ItalyResearchCenter);
       case 'techEvent':
         return this.renderTechEventPopup(data.data as TechEventPopupData);
       case 'techHQCluster':
@@ -479,6 +485,46 @@ export class MapPopup {
             </ul>
           </div>
         ` : ''}
+      </div>
+    `;
+  }
+
+  private renderResearchCenterPopup(center: ItalyResearchCenter): string {
+    const typeLabel = center.type === 'university'
+      ? 'University'
+      : center.type === 'research_center'
+        ? 'Research Center'
+        : 'Private Lab';
+    const focus = center.focus.length > 0
+      ? `<div class="popup-section"><span class="section-label">Focus</span><div class="popup-tags">${center.focus.map((f) => `<span class="popup-tag">${escapeHtml(f)}</span>`).join('')}</div></div>`
+      : '';
+    const website = center.website
+      ? `<div class="popup-section"><a class="popup-link" href="${sanitizeUrl(center.website)}" target="_blank" rel="noopener">${escapeHtml(center.website)}</a></div>`
+      : '';
+
+    return `
+      <div class="popup-header economic">
+        <span class="popup-title">${escapeHtml(center.name)}</span>
+        <span class="popup-badge medium">${escapeHtml(typeLabel)}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">${t('popups.city')}</span>
+            <span class="stat-value">${escapeHtml(center.city)}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">${t('popups.country')}</span>
+            <span class="stat-value">${escapeHtml(center.country)}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">Region</span>
+            <span class="stat-value">${escapeHtml(center.region)}</span>
+          </div>
+        </div>
+        ${focus}
+        ${website}
       </div>
     `;
   }
@@ -1702,6 +1748,32 @@ export class MapPopup {
         </div>
         ` : ''}
         ${hub.description ? `<p class="popup-description">${escapeHtml(hub.description)}</p>` : ''}
+      </div>
+    `;
+  }
+
+  private renderStartupDealflowPopup(item: StartupDealflowItem): string {
+    const statusLabel = item.status === 'portfolio' ? 'Portfolio' : 'Dealflow';
+    const website = item.website ? sanitizeUrl(item.website) : null;
+    return `
+      <div class="popup-header startup-hub ${item.status === 'portfolio' ? 'mega' : 'emerging'}">
+        <span class="popup-title">${item.status === 'portfolio' ? '⭐' : '🚀'} ${escapeHtml(item.name)}</span>
+        <span class="popup-badge ${item.status === 'portfolio' ? 'mega' : 'major'}">${statusLabel}</span>
+        <button class="popup-close">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-subtitle">${escapeHtml(item.city)}, ${escapeHtml(item.region)} - ${escapeHtml(item.country)}</div>
+        <div class="popup-stats">
+          <div class="popup-stat">
+            <span class="stat-label">Stage</span>
+            <span class="stat-value">${escapeHtml(item.stage)}</span>
+          </div>
+          <div class="popup-stat">
+            <span class="stat-label">Sectors</span>
+            <span class="stat-value">${escapeHtml(item.sectors.slice(0, 2).join(', ') || 'n/a')}</span>
+          </div>
+        </div>
+        ${website ? `<a class="popup-link" href="${website}" target="_blank" rel="noopener">Open website →</a>` : ''}
       </div>
     `;
   }

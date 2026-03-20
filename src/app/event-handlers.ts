@@ -1,5 +1,5 @@
 import type { AppContext, AppModule } from '@/app/app-context';
-import type { PanelConfig } from '@/types';
+import type { PanelConfig, MapLayers } from '@/types';
 import type { MapView } from '@/components';
 import type { ClusteredEvent } from '@/types';
 import type { DashboardSnapshot } from '@/services/storage';
@@ -65,11 +65,16 @@ export class EventHandlerManager implements AppModule {
   private boundResizeHandler: (() => void) | null = null;
   private boundVisibilityHandler: (() => void) | null = null;
   private boundDesktopExternalLinkHandler: ((e: MouseEvent) => void) | null = null;
+  private boundWorkspaceSwitchHandler: ((e: Event) => void) | null = null;
   private boundIdleResetHandler: (() => void) | null = null;
   private idleTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
   private readonly IDLE_PAUSE_MS = 2 * 60 * 1000;
+  private startupWorkspaceActive = false;
+  private startupWorkspaceViewSnapshot: MapView | null = null;
+  private startupWorkspaceLayerSnapshot: MapLayers | null = null;
+  private startupWorkspacePinnedSnapshot: boolean | null = null;
 
   constructor(ctx: AppContext, callbacks: EventHandlerCallbacks) {
     this.ctx = ctx;
@@ -140,6 +145,10 @@ export class EventHandlerManager implements AppModule {
       document.removeEventListener('click', this.boundDesktopExternalLinkHandler, true);
       this.boundDesktopExternalLinkHandler = null;
     }
+    if (this.boundWorkspaceSwitchHandler) {
+      document.removeEventListener('workspace:switch', this.boundWorkspaceSwitchHandler);
+      this.boundWorkspaceSwitchHandler = null;
+    }
     if (this.idleTimeoutId) {
       clearTimeout(this.idleTimeoutId);
       this.idleTimeoutId = null;
@@ -169,6 +178,19 @@ export class EventHandlerManager implements AppModule {
       this.callbacks.updateSearchIndex();
       this.ctx.searchModal?.open();
     });
+
+    if (SITE_VARIANT === 'tech') {
+      document.getElementById('startupWorkspaceBtn')?.addEventListener('click', () => {
+        this.setStartupWorkspace(!this.startupWorkspaceActive);
+      });
+      this.boundWorkspaceSwitchHandler = (evt: Event) => {
+        const detail = (evt as CustomEvent<{ workspace?: string }>).detail;
+        const target = detail?.workspace;
+        if (target === 'startup') this.setStartupWorkspace(true);
+        if (target === 'main') this.setStartupWorkspace(false);
+      };
+      document.addEventListener('workspace:switch', this.boundWorkspaceSwitchHandler);
+    }
 
     document.getElementById('copyLinkBtn')?.addEventListener('click', async () => {
       const shareUrl = this.getShareUrl();
@@ -304,6 +326,99 @@ export class EventHandlerManager implements AppModule {
     });
 
     this.resetIdleTimer();
+  }
+
+  private setStartupWorkspace(active: boolean): void {
+    if (SITE_VARIANT !== 'tech') return;
+    if (active === this.startupWorkspaceActive) return;
+
+    const startupPanelIds: Array<'startup-dealflow' | 'portfolio-startups'> = ['startup-dealflow', 'portfolio-startups'];
+    const startupBtn = document.getElementById('startupWorkspaceBtn');
+    const startupRoot = document.getElementById('startupWorkspaceRoot');
+    const startupMapMount = document.getElementById('startupMapMount');
+    const startupPanelsMount = document.getElementById('startupPanelsMount');
+    const mainContent = this.ctx.container.querySelector('.main-content') as HTMLElement | null;
+    const mapSection = document.getElementById('mapSection');
+    const panelsGrid = document.getElementById('panelsGrid');
+    const mapTitle = document.getElementById('mapTitle');
+    const mapPinBtn = document.getElementById('mapPinBtn');
+    const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement | null;
+    const applyOnlyStartupLayers = () => {
+      for (const key of Object.keys(this.ctx.mapLayers)) {
+        this.ctx.mapLayers[key as keyof MapLayers] = false;
+      }
+      this.ctx.mapLayers.startupDealflow = true;
+      this.ctx.mapLayers.portfolioStartups = true;
+      this.ctx.map?.setLayers(this.ctx.mapLayers);
+    };
+
+    if (active) {
+      const current = this.ctx.map?.getState();
+      this.startupWorkspaceViewSnapshot = current?.view ?? null;
+      this.startupWorkspaceLayerSnapshot = { ...this.ctx.mapLayers };
+
+      applyOnlyStartupLayers();
+      this.ctx.map?.setView('italy');
+      if (regionSelect) regionSelect.value = 'italy';
+      if (startupRoot) startupRoot.scrollTop = 0;
+
+      if (mapSection && startupMapMount && mapSection.parentElement !== startupMapMount) {
+        startupMapMount.appendChild(mapSection);
+      }
+      if (mapSection) {
+        this.startupWorkspacePinnedSnapshot = mapSection.classList.contains('pinned');
+        mapSection.classList.remove('pinned');
+        localStorage.setItem('map-pinned', 'false');
+      }
+      if (mapPinBtn) {
+        mapPinBtn.classList.remove('active');
+      }
+      if (startupPanelsMount) {
+        startupPanelIds.forEach((panelId) => {
+          const panel = this.ctx.panels[panelId];
+          if (!panel) return;
+          const el = panel.getElement();
+          if (el.parentElement !== startupPanelsMount) {
+            startupPanelsMount.appendChild(el);
+          }
+          el.style.display = '';
+        });
+      }
+    } else {
+      if (this.startupWorkspaceLayerSnapshot) {
+        Object.assign(this.ctx.mapLayers, this.startupWorkspaceLayerSnapshot);
+        this.ctx.map?.setLayers(this.ctx.mapLayers);
+      }
+      if (this.startupWorkspaceViewSnapshot) {
+        this.ctx.map?.setView(this.startupWorkspaceViewSnapshot);
+        if (regionSelect) regionSelect.value = this.startupWorkspaceViewSnapshot;
+      }
+
+      if (mapSection && mainContent && mapSection.parentElement !== mainContent) {
+        mainContent.insertBefore(mapSection, panelsGrid ?? null);
+      }
+      if (mapSection && this.startupWorkspacePinnedSnapshot === true) {
+        mapSection.classList.add('pinned');
+        localStorage.setItem('map-pinned', 'true');
+      }
+      if (mapPinBtn) {
+        mapPinBtn.classList.toggle('active', mapSection?.classList.contains('pinned') ?? false);
+      }
+      this.startupWorkspacePinnedSnapshot = null;
+    }
+
+    if (startupRoot) startupRoot.classList.toggle('active', active);
+    if (mainContent) mainContent.style.display = active ? 'none' : '';
+    this.ctx.container.classList.toggle('startup-workspace-active', active);
+    if (startupBtn) {
+      startupBtn.classList.toggle('active', active);
+      startupBtn.textContent = active ? t('header.mainWorkspace') : t('header.startupWorkspace');
+    }
+    if (mapTitle) {
+      mapTitle.textContent = active ? t('panels.startupMap') : t('panels.techMap');
+    }
+    this.ctx.map?.render();
+    this.startupWorkspaceActive = active;
   }
 
   resetIdleTimer(): void {

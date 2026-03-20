@@ -39,3 +39,5 @@ export { generateSummary, translateText } from './summarization';
 export * from './cached-theater-posture';
 export * from './trade';
 export * from './supply-chain';
+export * from './startup-dealflow';
+export * from './portfolio-news-feeds';

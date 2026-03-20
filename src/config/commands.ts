@@ -33,6 +33,7 @@ export const COMMANDS: Command[] = [
   { id: 'nav:africa', keywords: ['africa'], label: 'Go to Africa', icon: '\u{1F30D}', category: 'navigate' },
   { id: 'nav:latam', keywords: ['latam', 'latin america', 'south america'], label: 'Go to Latin America', icon: '\u{1F30E}', category: 'navigate' },
   { id: 'nav:oceania', keywords: ['oceania', 'australia', 'pacific islands'], label: 'Go to Oceania', icon: '\u{1F30F}', category: 'navigate' },
+  { id: 'nav:italy', keywords: ['italy', 'italia', 'italian'], label: 'Go to Italy', icon: '\u{1F1EE}\u{1F1F9}', category: 'navigate' },
 
   // Layer presets (toggle groups)
   { id: 'layers:military', keywords: ['military', 'military layers', 'show military'], label: 'Show military layers', icon: '\u{1F396}\uFE0F', category: 'layers' },

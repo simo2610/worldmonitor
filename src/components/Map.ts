@@ -4,7 +4,7 @@ import { escapeHtml } from '@/utils/sanitize';
 import { getCSSColor } from '@/utils';
 import type { Topology, GeometryCollection } from 'topojson-specification';
 import type { Feature, Geometry } from 'geojson';
-import type { MapLayers, Hotspot, NewsItem, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent, CyberThreat, CableHealthRecord } from '@/types';
+import type { MapLayers, Hotspot, NewsItem, InternetOutage, RelatedAsset, AssetType, AisDisruptionEvent, AisDensityZone, CableAdvisory, RepairShip, SocialUnrestEvent, MilitaryFlight, MilitaryVessel, MilitaryFlightCluster, MilitaryVesselCluster, NaturalEvent, CyberThreat, CableHealthRecord, StartupDealflowItem } from '@/types';
 import type { AirportDelayAlert } from '@/services/aviation';
 import type { Earthquake } from '@/services/earthquakes';
 import type { TechHubActivity } from '@/services/tech-activity';
@@ -53,9 +53,18 @@ import {
 import { getCountryScore } from '@/services/country-instability';
 import { getAlertsNearLocation } from '@/services/geo-convergence';
 import { t } from '@/services/i18n';
+import {
+  getItalyResearchCenters,
+  loadItalyResearchCenters,
+} from '@/services/italy-research-centers';
+import {
+  getStartupDealflowItems,
+  loadStartupDealflowItems,
+} from '@/services/startup-dealflow';
+import type { ItalyResearchCenter } from '@/config/it-research-centers';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
-export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
+export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania' | 'italy';
 
 interface MapState {
   zoom: number;
@@ -131,8 +140,10 @@ export class MapComponent {
   private naturalEvents: NaturalEvent[] = [];
   private firmsFireData: Array<{ lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string }> = [];
   private techEvents: TechEventMarker[] = [];
+  private startupDealflowItems: StartupDealflowItem[] = [];
   private techActivities: TechHubActivity[] = [];
   private geoActivities: GeoHubActivity[] = [];
+  private italyResearchCenters: ItalyResearchCenter[] = [];
   private news: NewsItem[] = [];
   private onTechHubClick?: (hub: TechHubActivity) => void;
   private onGeoHubClick?: (hub: GeoHubActivity) => void;
@@ -159,6 +170,8 @@ export class MapComponent {
     this.container = container;
     this.state = initialState;
     this.hotspots = [...INTEL_HOTSPOTS];
+    this.italyResearchCenters = getItalyResearchCenters();
+    this.startupDealflowItems = getStartupDealflowItems();
 
     this.wrapper = document.createElement('div');
     this.wrapper.className = 'map-wrapper';
@@ -200,6 +213,20 @@ export class MapComponent {
       this.baseRendered = false;
       this.render();
     });
+    void this.initItalyResearchCenters();
+    void this.initStartupDealflowItems();
+  }
+
+  private async initItalyResearchCenters(): Promise<void> {
+    const loaded = await loadItalyResearchCenters();
+    this.italyResearchCenters = loaded;
+    this.render();
+  }
+
+  private async initStartupDealflowItems(): Promise<void> {
+    const loaded = await loadStartupDealflowItems();
+    this.startupDealflowItems = loaded;
+    this.render();
   }
 
   private setupResizeObserver(): void {
@@ -342,7 +369,7 @@ export class MapComponent {
     ];
     const techLayers: (keyof MapLayers)[] = [
       'cables', 'datacenters', 'outages',                // tech infrastructure
-      'startupHubs', 'cloudRegions', 'accelerators', 'techHQs', 'techEvents', // tech ecosystem
+      'startupHubs', 'startupDealflow', 'portfolioStartups', 'cloudRegions', 'accelerators', 'techHQs', 'researchUniversities', 'researchCenters', 'techEvents', // tech ecosystem
       'natural', 'weather',                               // natural events
       'economic',                                         // economic/geographic
     ];
@@ -374,6 +401,8 @@ export class MapComponent {
       economic: 'components.deckgl.layers.economicCenters',
       waterways: 'components.deckgl.layers.strategicWaterways',
       startupHubs: 'components.deckgl.layers.startupHubs',
+      startupDealflow: 'components.deckgl.layers.startupDealflow',
+      portfolioStartups: 'components.deckgl.layers.portfolioStartups',
       cloudRegions: 'components.deckgl.layers.cloudRegions',
       accelerators: 'components.deckgl.layers.accelerators',
       techHQs: 'components.deckgl.layers.techHQs',
@@ -386,6 +415,8 @@ export class MapComponent {
     };
     const getLayerLabel = (layer: keyof MapLayers): string => {
       if (layer === 'sanctions') return t('components.deckgl.layerHelp.labels.sanctions');
+      if (layer === 'researchUniversities') return 'Universita IT';
+      if (layer === 'researchCenters') return 'Centri Ricerca IT';
       const key = layerLabelKeys[layer];
       return key ? t(key) : layer;
     };
@@ -443,8 +474,12 @@ export class MapComponent {
       <div class="layer-help-content">
         ${helpSection('techEcosystem', [
           helpItem(label('startupHubs'), 'techStartupHubs'),
+          helpItem(label('startupDealflow'), 'techStartupHubs'),
+          helpItem(label('portfolioStartups'), 'techStartupHubs'),
           helpItem(label('cloudRegions'), 'techCloudRegions'),
           helpItem(label('techHQs'), 'techHQs'),
+          helpItem('UNIVERSITA IT', 'techHQs'),
+          helpItem('CENTRI RICERCA IT', 'techHQs'),
           helpItem(label('accelerators'), 'techAccelerators'),
           helpItem(label('techEvents'), 'techEvents'),
         ])}
@@ -581,6 +616,10 @@ export class MapComponent {
       legend.innerHTML = `
         <div class="map-legend-item"><span class="legend-dot" style="background:#8b5cf6"></span>${escapeHtml(t('components.deckgl.layers.techHQs').toUpperCase())}</div>
         <div class="map-legend-item"><span class="legend-dot" style="background:#06b6d4"></span>${escapeHtml(t('components.deckgl.layers.startupHubs').toUpperCase())}</div>
+        <div class="map-legend-item"><span class="legend-dot" style="background:#4aa8ff"></span>${escapeHtml(t('components.deckgl.layers.startupDealflow').toUpperCase())}</div>
+        <div class="map-legend-item"><span class="legend-dot" style="background:#ffb347"></span>${escapeHtml(t('components.deckgl.layers.portfolioStartups').toUpperCase())}</div>
+        <div class="map-legend-item"><span class="legend-dot" style="background:#d28cff"></span>UNIVERSITA (IT)</div>
+        <div class="map-legend-item"><span class="legend-dot" style="background:#5abeff"></span>RESEARCH CENTERS (IT)</div>
         <div class="map-legend-item"><span class="legend-dot" style="background:#f59e0b"></span>${escapeHtml(t('components.deckgl.layers.cloudRegions').toUpperCase())}</div>
         <div class="map-legend-item"><span class="map-legend-icon" style="color:#a855f7">📅</span>${escapeHtml(t('components.deckgl.layers.techEvents').toUpperCase())}</div>
         <div class="map-legend-item"><span class="map-legend-icon" style="color:#4ecdc4">💾</span>${escapeHtml(t('components.deckgl.layers.aiDataCenters').toUpperCase())}</div>
@@ -1775,6 +1814,63 @@ export class MapComponent {
       });
     }
 
+    // Startup dealflow + portfolio startups (manual seed / remote override)
+    if (this.state.layers.startupDealflow || this.state.layers.portfolioStartups) {
+      const visibleItems = this.startupDealflowItems.filter((item) => {
+        if (item.status === 'portfolio') return this.state.layers.portfolioStartups;
+        return this.state.layers.startupDealflow;
+      });
+
+      visibleItems.forEach((item) => {
+        const pos = projection([item.lon, item.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `startup-dealflow-marker ${item.status}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+        div.style.position = 'absolute';
+        div.style.transform = 'translate(-50%, -50%)';
+        div.style.cursor = 'pointer';
+        div.style.zIndex = '7';
+
+        const dot = document.createElement('div');
+        dot.style.width = item.status === 'portfolio' ? '11px' : '9px';
+        dot.style.height = item.status === 'portfolio' ? '11px' : '9px';
+        dot.style.borderRadius = '50%';
+        dot.style.background = item.status === 'portfolio' ? '#ffb347' : '#4aa8ff';
+        dot.style.border = '1px solid rgba(255,255,255,0.92)';
+        dot.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.25)';
+        div.appendChild(dot);
+
+        if (this.state.zoom >= 4.3) {
+          const label = document.createElement('div');
+          label.className = 'startup-dealflow-label';
+          label.textContent = item.name;
+          label.style.marginTop = '2px';
+          label.style.fontSize = '10px';
+          label.style.whiteSpace = 'nowrap';
+          label.style.color = 'var(--text-primary)';
+          label.style.textShadow = '0 1px 2px rgba(0,0,0,0.6)';
+          div.appendChild(label);
+        }
+
+        div.title = `${item.name} · ${item.stage} · ${item.city}, ${item.country}`;
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: item.status === 'portfolio' ? 'portfolioStartup' : 'startupDealflow',
+            data: item,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
+
     // Cloud Regions (☁️ icons by provider)
     if (this.state.layers.cloudRegions) {
       CLOUD_REGIONS.forEach((region) => {
@@ -1879,6 +1975,49 @@ export class MapComponent {
               y: e.clientY - rect.top,
             });
           }
+        });
+
+        this.overlays.appendChild(div);
+      });
+    }
+
+    // Italian universities and research centers (🎓/🔬 icons)
+    if (this.state.layers.researchUniversities || this.state.layers.researchCenters) {
+      const visibleResearchEntities = this.italyResearchCenters.filter((center) => {
+        if (center.type === 'university') return this.state.layers.researchUniversities;
+        return this.state.layers.researchCenters;
+      });
+
+      visibleResearchEntities.forEach((center) => {
+        const pos = projection([center.lon, center.lat]);
+        if (!pos) return;
+
+        const div = document.createElement('div');
+        div.className = `research-center-marker ${center.type}`;
+        div.style.left = `${pos[0]}px`;
+        div.style.top = `${pos[1]}px`;
+
+        const icon = document.createElement('div');
+        icon.className = 'research-center-icon';
+        icon.textContent = center.type === 'university' ? '🎓' : center.type === 'research_center' ? '🔬' : '🧪';
+        div.appendChild(icon);
+
+        if (this.state.zoom >= 4) {
+          const label = document.createElement('div');
+          label.className = 'research-center-label';
+          label.textContent = center.name;
+          div.appendChild(label);
+        }
+
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = this.container.getBoundingClientRect();
+          this.popup.show({
+            type: 'researchCenter',
+            data: center,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          });
         });
 
         this.overlays.appendChild(div);
@@ -2884,12 +3023,16 @@ export class MapComponent {
       latam: { zoom: 2.0, pan: { x: 120, y: -100 } },
       africa: { zoom: 2.2, pan: { x: -40, y: -30 } },
       oceania: { zoom: 2.2, pan: { x: -420, y: -100 } },
+      italy: { zoom: 5.6, pan: { x: 0, y: 0 } },
     };
 
     const settings = viewSettings[view];
     this.state.zoom = settings.zoom;
     this.state.pan = settings.pan;
     this.applyTransform();
+    if (view === 'italy') {
+      this.setCenter(42.6, 12.6);
+    }
     this.render();
   }
 

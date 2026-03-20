@@ -55,6 +55,9 @@ import {
   fetchShippingRates,
   fetchChokepointStatus,
   fetchCriticalMinerals,
+  loadStartupDealflowItems,
+  buildPortfolioStartupFeeds,
+  extractPortfolioStartupNameFromFeed,
 } from '@/services';
 import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
@@ -125,6 +128,7 @@ export class DataLoaderManager implements AppModule {
   private callbacks: DataLoaderCallbacks;
 
   private mapFlashCache: Map<string, number> = new Map();
+  private portfolioStartupUniverse = 0;
   private readonly MAP_FLASH_COOLDOWN_MS = 10 * 60 * 1000;
   private readonly applyTimeRangeFilterToNewsPanelsDebounced = debounce(() => {
     this.applyTimeRangeFilterToNewsPanels();
@@ -409,6 +413,19 @@ export class DataLoaderManager implements AppModule {
     const panel = this.ctx.newsPanels[category];
     if (!panel) return;
     const filteredItems = this.filterItemsByTimeRange(items);
+    if (category === 'portfolio-startups') {
+      const covered = new Set<string>();
+      filteredItems.forEach((item) => {
+        const startupName = extractPortfolioStartupNameFromFeed(item.source);
+        if (startupName) covered.add(startupName);
+      });
+      const total = this.portfolioStartupUniverse > 0 ? this.portfolioStartupUniverse : covered.size;
+      const ratio = total > 0 ? covered.size / total : 0;
+      const tone = ratio >= 0.5 ? 'good' : ratio >= 0.25 ? 'neutral' : 'warn';
+      panel.setContextBadge(`coverage ${covered.size}/${total}`, tone);
+    } else {
+      panel.clearContextBadge();
+    }
     if (filteredItems.length === 0 && items.length > 0) {
       panel.renderFilteredEmpty(`No items in ${this.getTimeRangeLabel()}`);
       return;
@@ -541,6 +558,19 @@ export class DataLoaderManager implements AppModule {
         chunk.map(({ key, feeds }) => this.loadNewsCategory(key, feeds))
       );
       categoryResults.push(...chunkResults);
+    }
+
+    if (SITE_VARIANT === 'tech' && this.ctx.newsPanels['portfolio-startups']) {
+      try {
+        const startupItems = await loadStartupDealflowItems();
+        this.portfolioStartupUniverse = startupItems.filter((item) => item.status === 'portfolio').length;
+        const portfolioFeeds = buildPortfolioStartupFeeds(startupItems);
+        const portfolioNews = await this.loadNewsCategory('portfolio-startups', portfolioFeeds);
+        categoryResults.push({ status: 'fulfilled', value: portfolioNews });
+      } catch (error) {
+        console.error('[App] Portfolio startup feeds failed:', error);
+        categoryResults.push({ status: 'rejected', reason: error });
+      }
     }
 
     const collectedNews: NewsItem[] = [];

@@ -8,7 +8,7 @@ interface CommandResult {
   score: number;
 }
 
-export type SearchResultType = 'country' | 'news' | 'hotspot' | 'market' | 'prediction' | 'conflict' | 'base' | 'pipeline' | 'cable' | 'datacenter' | 'earthquake' | 'outage' | 'nuclear' | 'irradiator' | 'techcompany' | 'ailab' | 'startup' | 'techevent' | 'techhq' | 'accelerator' | 'exchange' | 'financialcenter' | 'centralbank' | 'commodityhub';
+export type SearchResultType = 'country' | 'news' | 'hotspot' | 'market' | 'prediction' | 'conflict' | 'base' | 'pipeline' | 'cable' | 'datacenter' | 'earthquake' | 'outage' | 'nuclear' | 'irradiator' | 'techcompany' | 'ailab' | 'startup' | 'techevent' | 'techhq' | 'accelerator' | 'startupDealflow' | 'portfolioStartup' | 'exchange' | 'financialcenter' | 'centralbank' | 'commodityhub';
 
 export interface SearchResult {
   type: SearchResultType;
@@ -191,7 +191,7 @@ export class SearchModal {
       'news', 'prediction', 'market', 'earthquake', 'outage',
       'conflict', 'hotspot', 'country',
       'base', 'pipeline', 'cable', 'datacenter', 'nuclear', 'irradiator',
-      'techcompany', 'ailab', 'startup', 'techevent', 'techhq', 'accelerator'
+      'techcompany', 'ailab', 'startup', 'startupDealflow', 'portfolioStartup', 'techevent', 'techhq', 'accelerator'
     ];
 
     this.results = [];
@@ -299,6 +299,8 @@ export class SearchModal {
       techcompany: '\u{1F3E2}',
       ailab: '\u{1F9E0}',
       startup: '\u{1F680}',
+      startupDealflow: '\u{1F4BC}',
+      portfolioStartup: '\u{1F4BC}',
       techevent: '\u{1F4C5}',
       techhq: '\u{1F984}',
       accelerator: '\u{1F680}',

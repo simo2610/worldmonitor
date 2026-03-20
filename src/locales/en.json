@@ -83,6 +83,8 @@
     "settings": "SETTINGS",
     "sources": "SOURCES",
     "copyLink": "Copy Link",
+    "startupWorkspace": "Startup Dealflow",
+    "mainWorkspace": "Main Dashboard",
     "fullscreen": "Fullscreen",
     "pinMap": "Pin map to top",
     "viewOnGitHub": "View on GitHub",
@@ -145,6 +147,7 @@
     "markets": "Markets",
     "map": "Global Situation",
     "techMap": "Global Tech",
+    "startupMap": "Startup Dealflow Map",
     "techHubs": "Hot Tech Hubs",
     "status": "System Status",
     "insights": "AI Insights",
@@ -191,6 +194,8 @@
     "regionalStartups": "Global Startup News",
     "unicorns": "Unicorn Tracker",
     "accelerators": "Accelerators & Demo Days",
+    "startupDealflow": "Startup Dealflow",
+    "portfolioStartups": "Portfolio Startup News",
     "security": "Cybersecurity",
     "policy": "AI Policy & Regulation",
     "regulation": "AI Regulation Dashboard",
@@ -240,6 +245,8 @@
         "techcompany": "Tech Company",
         "ailab": "AI Lab",
         "startup": "Startup",
+        "startupDealflow": "Startup Dealflow",
+        "portfolioStartup": "Portfolio Startup",
         "techevent": "Tech Event",
         "techhq": "Tech HQ",
         "accelerator": "Accelerator"
@@ -797,6 +804,8 @@
       },
       "layers": {
         "startupHubs": "Startup Hubs",
+        "startupDealflow": "Startup Dealflow",
+        "portfolioStartups": "Portfolio Startups",
         "techHQs": "Tech HQs",
         "accelerators": "Accelerators",
         "cloudRegions": "Cloud Regions",
@@ -1323,7 +1332,9 @@
     "panel": {
       "showMethodologyInfo": "Show methodology info",
       "dragToResize": "Drag to resize (double-click to reset)",
-      "openSettings": "Open Settings"
+      "openSettings": "Open Settings",
+      "openExpandedView": "Open expanded view",
+      "closeExpandedView": "Close expanded view"
     },
     "languageSelector": {
       "selectLanguage": "Select Language"

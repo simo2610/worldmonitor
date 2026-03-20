@@ -33,6 +33,7 @@ import type {
   MapDatacenterCluster,
   CyberThreat,
   CableHealthRecord,
+  StartupDealflowItem,
 } from '@/types';
 import type { AirportDelayAlert } from '@/services/aviation';
 import type { DisplacementFlow } from '@/services/displacement';
@@ -90,9 +91,18 @@ import type { RenewableInstallation } from '@/services/renewable-installations';
 import type { SpeciesRecovery } from '@/services/conservation-data';
 import { getCountriesGeoJson, getCountryAtCoordinates } from '@/services/country-geometry';
 import type { FeatureCollection, Geometry } from 'geojson';
+import {
+  getItalyResearchCenters,
+  loadItalyResearchCenters,
+} from '@/services/italy-research-centers';
+import {
+  getStartupDealflowItems,
+  loadStartupDealflowItems,
+} from '@/services/startup-dealflow';
+import type { ItalyResearchCenter } from '@/config/it-research-centers';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
-export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
+export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania' | 'italy';
 type MapInteractionMode = 'flat' | '3d';
 
 export interface CountryClickPayload {
@@ -137,6 +147,7 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
   latam: { longitude: -60, latitude: -15, zoom: 3 },
   africa: { longitude: 20, latitude: 5, zoom: 3 },
   oceania: { longitude: 135, latitude: -25, zoom: 3.5 },
+  italy: { longitude: 12.6, latitude: 42.6, zoom: 5.7 },
 };
 
 const MAP_INTERACTION_MODE: MapInteractionMode =
@@ -202,11 +213,20 @@ function getOverlayColors() {
     startupHub: isLight
       ? [22, 163, 74, 220] as [number, number, number, number]
       : [0, 255, 150, 200] as [number, number, number, number],
+    startupDealflow: isLight
+      ? [0, 122, 255, 220] as [number, number, number, number]
+      : [70, 170, 255, 210] as [number, number, number, number],
+    portfolioStartup: isLight
+      ? [255, 140, 0, 220] as [number, number, number, number]
+      : [255, 200, 80, 220] as [number, number, number, number],
     techHQ: [100, 200, 255, 200] as [number, number, number, number],
     accelerator: isLight
       ? [180, 120, 0, 220] as [number, number, number, number]
       : [255, 200, 0, 200] as [number, number, number, number],
     cloudRegion: [150, 100, 255, 180] as [number, number, number, number],
+    researchCenter: isLight
+      ? [180, 80, 210, 220] as [number, number, number, number]
+      : [210, 120, 255, 210] as [number, number, number, number],
     stockExchange: isLight
       ? [20, 120, 200, 220] as [number, number, number, number]
       : [80, 200, 255, 210] as [number, number, number, number],
@@ -273,6 +293,8 @@ export class DeckGLMap {
   private naturalEvents: NaturalEvent[] = [];
   private firmsFireData: Array<{ lat: number; lon: number; brightness: number; frp: number; confidence: number; region: string; acq_date: string; daynight: string }> = [];
   private techEvents: TechEventMarker[] = [];
+  private italyResearchCenters: ItalyResearchCenter[] = [];
+  private startupDealflowItems: StartupDealflowItem[] = [];
   private flightDelays: AirportDelayAlert[] = [];
   private news: NewsItem[] = [];
   private newsLocations: Array<{ lat: number; lon: number; title: string; threatLevel: string; timestamp?: Date }> = [];
@@ -341,11 +363,14 @@ export class DeckGLMap {
   private debouncedRebuildLayers: () => void;
   private rafUpdateLayers: () => void;
   private moveTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private legendEl: HTMLElement | null = null;
 
   constructor(container: HTMLElement, initialState: DeckMapState) {
     this.container = container;
     this.state = initialState;
     this.hotspots = [...INTEL_HOTSPOTS];
+    this.italyResearchCenters = getItalyResearchCenters();
+    this.startupDealflowItems = getStartupDealflowItems();
 
     this.debouncedRebuildLayers = debounce(() => {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
@@ -384,6 +409,20 @@ export class DeckGLMap {
     this.createTimeSlider();
     this.createLayerToggles();
     this.createLegend();
+    void this.initItalyResearchCenters();
+    void this.initStartupDealflowItems();
+  }
+
+  private async initItalyResearchCenters(): Promise<void> {
+    const loaded = await loadItalyResearchCenters();
+    this.italyResearchCenters = loaded;
+    this.render();
+  }
+
+  private async initStartupDealflowItems(): Promise<void> {
+    const loaded = await loadStartupDealflowItems();
+    this.startupDealflowItems = loaded;
+    this.render();
   }
 
   private setupDOM(): void {
@@ -1158,8 +1197,20 @@ export class DeckGLMap {
       if (mapLayers.startupHubs) {
         layers.push(this.createStartupHubsLayer());
       }
+      if (mapLayers.startupDealflow) {
+        layers.push(this.createStartupDealflowLayer());
+      }
+      if (mapLayers.portfolioStartups) {
+        layers.push(this.createPortfolioStartupsLayer());
+      }
       if (mapLayers.techHQs) {
         layers.push(...this.createTechHQClusterLayers());
+      }
+      if (mapLayers.researchUniversities && this.italyResearchCenters.some((center) => center.type === 'university')) {
+        layers.push(this.createItalyUniversitiesLayer());
+      }
+      if (mapLayers.researchCenters && this.italyResearchCenters.some((center) => center.type !== 'university')) {
+        layers.push(this.createItalyResearchCentersLayer());
       }
       if (mapLayers.accelerators) {
         layers.push(this.createAcceleratorsLayer());
@@ -1921,6 +1972,38 @@ export class DeckGLMap {
     });
   }
 
+  private createStartupDealflowLayer(): ScatterplotLayer<StartupDealflowItem> {
+    return new ScatterplotLayer<StartupDealflowItem>({
+      id: 'startup-dealflow-layer',
+      data: this.startupDealflowItems.filter((item) => item.status === 'dealflow'),
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 7000,
+      getFillColor: COLORS.startupDealflow,
+      radiusMinPixels: 4,
+      radiusMaxPixels: 10,
+      stroked: true,
+      getLineColor: [255, 255, 255, 210],
+      lineWidthMinPixels: 1,
+      pickable: true,
+    });
+  }
+
+  private createPortfolioStartupsLayer(): ScatterplotLayer<StartupDealflowItem> {
+    return new ScatterplotLayer<StartupDealflowItem>({
+      id: 'portfolio-startups-layer',
+      data: this.startupDealflowItems.filter((item) => item.status === 'portfolio'),
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 9000,
+      getFillColor: COLORS.portfolioStartup,
+      radiusMinPixels: 5,
+      radiusMaxPixels: 12,
+      stroked: true,
+      getLineColor: [255, 255, 255, 240],
+      lineWidthMinPixels: 1,
+      pickable: true,
+    });
+  }
+
   private createAcceleratorsLayer(): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'accelerators-layer',
@@ -1943,6 +2026,41 @@ export class DeckGLMap {
       getFillColor: COLORS.cloudRegion,
       radiusMinPixels: 4,
       radiusMaxPixels: 12,
+      pickable: true,
+    });
+  }
+
+  private createItalyUniversitiesLayer(): ScatterplotLayer<ItalyResearchCenter> {
+    return new ScatterplotLayer<ItalyResearchCenter>({
+      id: 'it-research-universities-layer',
+      data: this.italyResearchCenters.filter((center) => center.type === 'university'),
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: 9000,
+      getFillColor: COLORS.researchCenter,
+      radiusMinPixels: 4,
+      radiusMaxPixels: 10,
+      stroked: true,
+      getLineColor: [255, 255, 255, 230],
+      lineWidthMinPixels: 1,
+      pickable: true,
+    });
+  }
+
+  private createItalyResearchCentersLayer(): ScatterplotLayer<ItalyResearchCenter> {
+    return new ScatterplotLayer<ItalyResearchCenter>({
+      id: 'it-research-centers-layer',
+      data: this.italyResearchCenters.filter((center) => center.type !== 'university'),
+      getPosition: (d) => [d.lon, d.lat],
+      getRadius: (d) => d.type === 'research_center' ? 8000 : 7000,
+      getFillColor: (d) => {
+        if (d.type === 'research_center') return [90, 190, 255, 210] as [number, number, number, number];
+        return [245, 180, 80, 210] as [number, number, number, number];
+      },
+      radiusMinPixels: 4,
+      radiusMaxPixels: 10,
+      stroked: true,
+      getLineColor: [255, 255, 255, 230],
+      lineWidthMinPixels: 1,
       pickable: true,
     });
   }
@@ -2637,12 +2755,20 @@ export class DeckGLMap {
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.type)} · ${text(obj.city)}</div>` };
       case 'startup-hubs-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.city)}</strong><br/>${text(obj.country)}</div>` };
+      case 'startup-dealflow-layer':
+      case 'portfolio-startups-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.stage)} · ${text(obj.city)}, ${text(obj.country)}</div>` };
       case 'tech-hqs-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.company)}</strong><br/>${text(obj.city)}</div>` };
       case 'accelerators-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.city)}</div>` };
       case 'cloud-regions-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.provider)}</strong><br/>${text(obj.region)}</div>` };
+      case 'it-research-universities-layer':
+      case 'it-research-centers-layer': {
+        const focus = Array.isArray(obj.focus) && obj.focus.length > 0 ? ` · ${text(obj.focus.slice(0, 2).join(', '))}` : '';
+        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.city)}, ${text(obj.region)}${focus}</div>` };
+      }
       case 'tech-events-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.title)}</strong><br/>${text(obj.location)}</div>` };
       case 'irradiators-layer':
@@ -2877,9 +3003,13 @@ export class DeckGLMap {
       'ports-layer': 'port',
       'flight-delays-layer': 'flight',
       'startup-hubs-layer': 'startupHub',
+      'startup-dealflow-layer': 'startupDealflow',
+      'portfolio-startups-layer': 'portfolioStartup',
       'tech-hqs-layer': 'techHQ',
       'accelerators-layer': 'accelerator',
       'cloud-regions-layer': 'cloudRegion',
+      'it-research-universities-layer': 'researchCenter',
+      'it-research-centers-layer': 'researchCenter',
       'tech-events-layer': 'techEvent',
       'apt-groups-layer': 'apt',
       'minerals-layer': 'mineral',
@@ -2946,6 +3076,7 @@ export class DeckGLMap {
           <option value="latam">${t('components.deckgl.views.latam')}</option>
           <option value="africa">${t('components.deckgl.views.africa')}</option>
           <option value="oceania">${t('components.deckgl.views.oceania')}</option>
+          <option value="italy">Italia</option>
         </select>
       </div>
     `;
@@ -3007,7 +3138,11 @@ export class DeckGLMap {
     const layerConfig = SITE_VARIANT === 'tech'
       ? [
         { key: 'startupHubs', label: t('components.deckgl.layers.startupHubs'), icon: '&#128640;' },
+        { key: 'startupDealflow', label: t('components.deckgl.layers.startupDealflow'), icon: '&#128188;' },
+        { key: 'portfolioStartups', label: t('components.deckgl.layers.portfolioStartups'), icon: '&#11088;' },
         { key: 'techHQs', label: t('components.deckgl.layers.techHQs'), icon: '&#127970;' },
+        { key: 'researchUniversities', label: 'Universita IT', icon: '&#127891;' },
+        { key: 'researchCenters', label: 'Centri Ricerca IT', icon: '&#128300;' },
         { key: 'accelerators', label: t('components.deckgl.layers.accelerators'), icon: '&#9889;' },
         { key: 'cloudRegions', label: t('components.deckgl.layers.cloudRegions'), icon: '&#9729;' },
         { key: 'datacenters', label: t('components.deckgl.layers.aiDataCenters'), icon: '&#128421;' },
@@ -3096,6 +3231,7 @@ export class DeckGLMap {
         const layer = (input as HTMLInputElement).closest('.layer-toggle')?.getAttribute('data-layer') as keyof MapLayers;
         if (layer) {
           this.state.layers[layer] = (input as HTMLInputElement).checked;
+          this.refreshLegend();
           this.render();
           this.onLayerChange?.(layer, (input as HTMLInputElement).checked, 'user');
         }
@@ -3161,6 +3297,8 @@ export class DeckGLMap {
           helpItem(label('startupHubs'), 'techStartupHubs'),
           helpItem(label('cloudRegions'), 'techCloudRegions'),
           helpItem(label('techHQs'), 'techHQs'),
+          helpItem('UNIVERSITA IT', 'techHQs'),
+          helpItem('CENTRI RICERCA IT', 'techHQs'),
           helpItem(label('accelerators'), 'techAccelerators'),
           helpItem(label('techEvents'), 'techEvents'),
         ])}
@@ -3285,6 +3423,13 @@ export class DeckGLMap {
   private createLegend(): void {
     const legend = document.createElement('div');
     legend.className = 'map-legend deckgl-legend';
+    this.legendEl = legend;
+    this.refreshLegend();
+    this.container.appendChild(legend);
+  }
+
+  private refreshLegend(): void {
+    if (!this.legendEl) return;
 
     // SVG shapes for different marker types
     const shapes = {
@@ -3295,13 +3440,36 @@ export class DeckGLMap {
     };
 
     const isLight = getCurrentTheme() === 'light';
+    const { layers } = this.state;
     const legendItems = SITE_VARIANT === 'tech'
       ? [
-          { shape: shapes.circle(isLight ? 'rgb(22, 163, 74)' : 'rgb(0, 255, 150)'), label: t('components.deckgl.legend.startupHub') },
-          { shape: shapes.circle('rgb(100, 200, 255)'), label: t('components.deckgl.legend.techHQ') },
-          { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 200, 0)'), label: t('components.deckgl.legend.accelerator') },
-          { shape: shapes.circle('rgb(150, 100, 255)'), label: t('components.deckgl.legend.cloudRegion') },
-          { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
+          ...(layers.startupDealflow
+            ? [{ shape: shapes.circle('rgb(70, 170, 255)'), label: t('components.deckgl.layers.startupDealflow') }]
+            : []),
+          ...(layers.portfolioStartups
+            ? [{ shape: shapes.circle(isLight ? 'rgb(255, 140, 0)' : 'rgb(255, 200, 80)'), label: t('components.deckgl.layers.portfolioStartups') }]
+            : []),
+          ...(layers.startupHubs
+            ? [{ shape: shapes.circle(isLight ? 'rgb(22, 163, 74)' : 'rgb(0, 255, 150)'), label: t('components.deckgl.legend.startupHub') }]
+            : []),
+          ...(layers.techHQs
+            ? [{ shape: shapes.circle('rgb(100, 200, 255)'), label: t('components.deckgl.legend.techHQ') }]
+            : []),
+          ...(layers.researchUniversities
+            ? [{ shape: shapes.circle(isLight ? 'rgb(180, 80, 210)' : 'rgb(210, 120, 255)'), label: 'Universita (IT)' }]
+            : []),
+          ...(layers.researchCenters
+            ? [{ shape: shapes.circle('rgb(90, 190, 255)'), label: 'Research Centers (IT)' }]
+            : []),
+          ...(layers.accelerators
+            ? [{ shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 200, 0)'), label: t('components.deckgl.legend.accelerator') }]
+            : []),
+          ...(layers.cloudRegions
+            ? [{ shape: shapes.circle('rgb(150, 100, 255)'), label: t('components.deckgl.legend.cloudRegion') }]
+            : []),
+          ...(layers.datacenters
+            ? [{ shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') }]
+            : []),
         ]
       : SITE_VARIANT === 'finance'
       ? [
@@ -3330,12 +3498,10 @@ export class DeckGLMap {
           { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
         ];
 
-    legend.innerHTML = `
+    this.legendEl.innerHTML = `
       <span class="legend-label-title">${t('components.deckgl.legend.title')}</span>
       ${legendItems.map(({ shape, label }) => `<span class="legend-item">${shape}<span class="legend-label">${label}</span></span>`).join('')}
     `;
-
-    this.container.appendChild(legend);
   }
 
   // Public API methods (matching MapComponent interface)
@@ -3437,6 +3603,7 @@ export class DeckGLMap {
 
   public setLayers(layers: MapLayers): void {
     this.state.layers = layers;
+    this.refreshLegend();
     this.render(); // Debounced
 
     // Update toggle checkboxes

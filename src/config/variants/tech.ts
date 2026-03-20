@@ -232,6 +232,10 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   cloudRegions: true,
   accelerators: false,
   techHQs: true,
+  researchUniversities: true,
+  researchCenters: true,
+  startupDealflow: false,
+  portfolioStartups: false,
   techEvents: true,
   // Finance layers (disabled in tech variant)
   stockExchanges: false,
@@ -280,6 +284,10 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   cloudRegions: false,
   accelerators: false,
   techHQs: false,
+  researchUniversities: true,
+  researchCenters: true,
+  startupDealflow: false,
+  portfolioStartups: false,
   techEvents: true,
   // Finance layers (disabled in tech variant)
   stockExchanges: false,

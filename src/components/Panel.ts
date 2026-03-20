@@ -3,6 +3,7 @@ import { invokeTauri } from '../services/tauri-bridge';
 import { t } from '../services/i18n';
 import { h, replaceChildren, safeHtml } from '../utils/dom-utils';
 import { trackPanelResized } from '@/services/analytics';
+import { SITE_VARIANT } from '@/config';
 
 export interface PanelOptions {
   id: string;
@@ -11,6 +12,8 @@ export interface PanelOptions {
   className?: string;
   trackActivity?: boolean;
   infoTooltip?: string;
+  enableDialogView?: boolean;
+  dialogTitle?: string;
 }
 
 const PANEL_SPANS_KEY = 'worldmonitor-panel-spans';
@@ -65,12 +68,24 @@ export class Panel {
   private onTouchMove: ((e: TouchEvent) => void) | null = null;
   private onTouchEnd: (() => void) | null = null;
   private onDocMouseUp: (() => void) | null = null;
+  private dialogToggleBtn: HTMLButtonElement | null = null;
+  private expandDialog: HTMLDialogElement | null = null;
+  private expandDialogBody: HTMLElement | null = null;
+  private dialogPlaceholder: HTMLElement | null = null;
+  private dialogCloseHandler: (() => void) | null = null;
+  private dialogCancelHandler: ((event: Event) => void) | null = null;
+  private dialogBackdropHandler: ((event: MouseEvent) => void) | null = null;
+  private isDialogOpen = false;
+  private readonly dialogEnabled: boolean;
+  private readonly dialogTitle: string;
   private readonly contentDebounceMs = 150;
   private pendingContentHtml: string | null = null;
   private contentDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: PanelOptions) {
     this.panelId = options.id;
+    this.dialogEnabled = options.enableDialogView ?? SITE_VARIANT === 'tech';
+    this.dialogTitle = options.dialogTitle ?? options.title;
     this.element = document.createElement('div');
     this.element.className = `panel ${options.className || ''}`;
     this.element.dataset.panel = options.id;
@@ -129,6 +144,10 @@ export class Panel {
       this.header.appendChild(this.countEl);
     }
 
+    if (this.dialogEnabled) {
+      this.setupDialogToggleButton();
+    }
+
     this.content = document.createElement('div');
     this.content.className = 'panel-content';
     this.content.id = `${options.id}Content`;
@@ -151,6 +170,127 @@ export class Panel {
     }
 
     this.showLoading();
+  }
+
+  private setupDialogToggleButton(): void {
+    const dialogBtn = document.createElement('button');
+    dialogBtn.type = 'button';
+    dialogBtn.className = 'panel-expand-btn';
+    dialogBtn.innerHTML = '<span aria-hidden="true">⤢</span>';
+    dialogBtn.title = t('components.panel.openExpandedView');
+    dialogBtn.setAttribute('aria-label', t('components.panel.openExpandedView'));
+    dialogBtn.setAttribute('aria-haspopup', 'dialog');
+    dialogBtn.setAttribute('aria-expanded', 'false');
+    dialogBtn.addEventListener('click', () => this.openDialogView());
+    this.header.appendChild(dialogBtn);
+    this.dialogToggleBtn = dialogBtn;
+  }
+
+  private ensureExpandDialog(): void {
+    if (this.expandDialog) return;
+
+    const dialog = document.createElement('dialog');
+    dialog.className = 'panel-expand-dialog';
+
+    const shell = document.createElement('div');
+    shell.className = 'panel-expand-shell';
+
+    const dialogHeader = document.createElement('div');
+    dialogHeader.className = 'panel-expand-header';
+
+    const title = document.createElement('h2');
+    title.className = 'panel-expand-title';
+    title.textContent = this.dialogTitle;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'panel-expand-close';
+    closeBtn.innerHTML = '<span aria-hidden="true">✕</span>';
+    closeBtn.setAttribute('aria-label', t('components.panel.closeExpandedView'));
+    closeBtn.title = t('components.panel.closeExpandedView');
+    closeBtn.addEventListener('click', () => this.closeDialogView());
+
+    dialogHeader.appendChild(title);
+    dialogHeader.appendChild(closeBtn);
+
+    const body = document.createElement('div');
+    body.className = 'panel-expand-body';
+
+    shell.appendChild(dialogHeader);
+    shell.appendChild(body);
+    dialog.appendChild(shell);
+    document.body.appendChild(dialog);
+
+    this.dialogCloseHandler = () => this.restoreDialogContent();
+    this.dialogCancelHandler = (event: Event) => {
+      event.preventDefault();
+      this.closeDialogView();
+    };
+    this.dialogBackdropHandler = (event: MouseEvent) => {
+      if (event.target === dialog) {
+        this.closeDialogView();
+      }
+    };
+
+    dialog.addEventListener('close', this.dialogCloseHandler);
+    dialog.addEventListener('cancel', this.dialogCancelHandler);
+    dialog.addEventListener('click', this.dialogBackdropHandler);
+
+    this.expandDialog = dialog;
+    this.expandDialogBody = body;
+  }
+
+  private openDialogView(): void {
+    if (!this.dialogEnabled || this.isDialogOpen) return;
+    this.ensureExpandDialog();
+    if (!this.expandDialog || !this.expandDialogBody) return;
+
+    this.dialogPlaceholder = document.createElement('div');
+    this.dialogPlaceholder.className = 'panel-expand-placeholder';
+    this.element.insertBefore(this.dialogPlaceholder, this.content);
+    this.expandDialogBody.appendChild(this.content);
+
+    this.isDialogOpen = true;
+    this.element.classList.add('panel-open-in-dialog');
+
+    if (this.dialogToggleBtn) {
+      this.dialogToggleBtn.setAttribute('aria-expanded', 'true');
+      this.dialogToggleBtn.setAttribute('aria-label', t('components.panel.closeExpandedView'));
+      this.dialogToggleBtn.title = t('components.panel.closeExpandedView');
+      this.dialogToggleBtn.innerHTML = '<span aria-hidden="true">⤡</span>';
+    }
+
+    this.expandDialog.showModal();
+  }
+
+  private closeDialogView(): void {
+    if (!this.expandDialog) return;
+    if (this.expandDialog.open) {
+      this.expandDialog.close();
+      return;
+    }
+    this.restoreDialogContent();
+  }
+
+  private restoreDialogContent(): void {
+    if (!this.isDialogOpen) return;
+
+    if (this.dialogPlaceholder && this.dialogPlaceholder.parentNode) {
+      this.dialogPlaceholder.replaceWith(this.content);
+    } else {
+      this.element.insertBefore(this.content, this.resizeHandle);
+    }
+
+    this.dialogPlaceholder = null;
+    this.isDialogOpen = false;
+    this.element.classList.remove('panel-open-in-dialog');
+
+    if (this.dialogToggleBtn) {
+      this.dialogToggleBtn.setAttribute('aria-expanded', 'false');
+      this.dialogToggleBtn.setAttribute('aria-label', t('components.panel.openExpandedView'));
+      this.dialogToggleBtn.title = t('components.panel.openExpandedView');
+      this.dialogToggleBtn.innerHTML = '<span aria-hidden="true">⤢</span>';
+    }
   }
 
   private setupResizeHandlers(): void {
@@ -431,6 +571,28 @@ export class Panel {
   }
 
   public destroy(): void {
+    this.restoreDialogContent();
+    if (this.expandDialog) {
+      if (this.expandDialog.open) {
+        this.expandDialog.close();
+      }
+      if (this.dialogCloseHandler) {
+        this.expandDialog.removeEventListener('close', this.dialogCloseHandler);
+      }
+      if (this.dialogCancelHandler) {
+        this.expandDialog.removeEventListener('cancel', this.dialogCancelHandler);
+      }
+      if (this.dialogBackdropHandler) {
+        this.expandDialog.removeEventListener('click', this.dialogBackdropHandler);
+      }
+      this.expandDialog.remove();
+      this.expandDialog = null;
+      this.expandDialogBody = null;
+      this.dialogCloseHandler = null;
+      this.dialogCancelHandler = null;
+      this.dialogBackdropHandler = null;
+    }
+
     this.abortController.abort();
     if (this.contentDebounceTimer) {
       clearTimeout(this.contentDebounceTimer);

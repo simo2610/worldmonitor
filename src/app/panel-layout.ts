@@ -34,6 +34,7 @@ import {
   TradePolicyPanel,
   SupplyChainPanel,
   SecurityAdvisoriesPanel,
+  StartupDealflowPanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { PositiveNewsFeedPanel } from '@/components/PositiveNewsFeedPanel';
@@ -163,13 +164,6 @@ export class PanelLayoutManager implements AppModule {
             </a>` : ''}`;
           })()}</div>
           <span class="logo">MONITOR</span><span class="version">v${__APP_VERSION__}</span>${BETA_MODE ? '<span class="beta-badge">BETA</span>' : ''}
-          <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="credit-link">
-            <svg class="x-logo" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-            <span class="credit-text">@eliehabib</span>
-          </a>
-          <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener" class="github-link" title="${t('header.viewOnGitHub')}">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          </a>
           <div class="status-indicator">
             <span class="status-dot"></span>
             <span>${t('header.live')}</span>
@@ -184,10 +178,12 @@ export class PanelLayoutManager implements AppModule {
               <option value="latam">${t('components.deckgl.views.latam')}</option>
               <option value="africa">${t('components.deckgl.views.africa')}</option>
               <option value="oceania">${t('components.deckgl.views.oceania')}</option>
+              <option value="italy">Italia</option>
             </select>
           </div>
         </div>
         <div class="header-right">
+          ${SITE_VARIANT === 'tech' ? `<button class="workspace-toggle-btn" id="startupWorkspaceBtn">${t('header.startupWorkspace')}</button>` : ''}
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> ${t('header.search')}</button>
           ${this.ctx.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           <button class="theme-toggle-btn" id="headerThemeToggle" title="${t('header.toggleTheme')}">
@@ -204,7 +200,7 @@ export class PanelLayoutManager implements AppModule {
         <div class="map-section" id="mapSection">
           <div class="panel-header">
             <div class="panel-header-left">
-              <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'happy' ? 'Good News Map' : t('panels.map')}</span>
+              <span class="panel-title" id="mapTitle">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'happy' ? 'Good News Map' : t('panels.map')}</span>
             </div>
             <span class="header-clock" id="headerClock"></span>
             <button class="map-pin-btn" id="mapPinBtn" title="${t('header.pinMap')}">
@@ -219,6 +215,14 @@ export class PanelLayoutManager implements AppModule {
         </div>
         <div class="panels-grid" id="panelsGrid"></div>
       </div>
+      ${SITE_VARIANT === 'tech' ? `
+      <div class="startup-workspace-root" id="startupWorkspaceRoot">
+        <div class="startup-workspace-content">
+          <div class="startup-map-mount" id="startupMapMount"></div>
+          <div class="startup-panels-mount" id="startupPanelsMount"></div>
+        </div>
+      </div>
+      ` : ''}
     `;
 
     this.createPanels();
@@ -309,6 +313,7 @@ export class PanelLayoutManager implements AppModule {
 
   private createPanels(): void {
     const panelsGrid = document.getElementById('panelsGrid')!;
+    const startupPanelsMount = document.getElementById('startupPanelsMount');
 
     const mapContainer = document.getElementById('mapContainer') as HTMLElement;
     this.ctx.map = new MapContainer(mapContainer, {
@@ -409,6 +414,16 @@ export class PanelLayoutManager implements AppModule {
     this.attachRelatedAssetHandlers(acceleratorsPanel);
     this.ctx.newsPanels['accelerators'] = acceleratorsPanel;
     this.ctx.panels['accelerators'] = acceleratorsPanel;
+
+    if (SITE_VARIANT === 'tech') {
+      const portfolioStartupsPanel = new NewsPanel('portfolio-startups', t('panels.portfolioStartups'));
+      this.attachRelatedAssetHandlers(portfolioStartupsPanel);
+      this.ctx.newsPanels['portfolio-startups'] = portfolioStartupsPanel;
+      this.ctx.panels['portfolio-startups'] = portfolioStartupsPanel;
+      if (startupPanelsMount) {
+        startupPanelsMount.appendChild(portfolioStartupsPanel.getElement());
+      }
+    }
 
     const fundingPanel = new NewsPanel('funding', t('panels.funding'));
     this.attachRelatedAssetHandlers(fundingPanel);
@@ -583,6 +598,25 @@ export class PanelLayoutManager implements AppModule {
       const techReadinessPanel = new TechReadinessPanel();
       this.ctx.panels['tech-readiness'] = techReadinessPanel;
 
+      if (SITE_VARIANT === 'tech') {
+        const startupDealflowPanel = new StartupDealflowPanel((item) => {
+          document.dispatchEvent(new CustomEvent('workspace:switch', { detail: { workspace: 'startup' } }));
+          const isItaly = item.country.toLowerCase() === 'italy';
+          this.ctx.map?.setView(isItaly ? 'italy' : 'eu');
+          this.ctx.map?.enableLayer(item.status === 'portfolio' ? 'portfolioStartups' : 'startupDealflow');
+          if (item.status === 'portfolio') {
+            this.ctx.mapLayers.portfolioStartups = true;
+          } else {
+            this.ctx.mapLayers.startupDealflow = true;
+          }
+          this.ctx.map?.setCenter(item.lat, item.lon, isItaly ? 6.8 : 5.2);
+        });
+        this.ctx.panels['startup-dealflow'] = startupDealflowPanel;
+        if (startupPanelsMount) {
+          startupPanelsMount.appendChild(startupDealflowPanel.getElement());
+        }
+      }
+
       this.ctx.panels['macro-signals'] = new MacroSignalsPanel();
       this.ctx.panels['etf-flows'] = new ETFFlowsPanel();
       this.ctx.panels['stablecoins'] = new StablecoinPanel();
@@ -673,7 +707,9 @@ export class PanelLayoutManager implements AppModule {
       }
     }
 
+    const startupOnlyPanels = new Set(['startup-dealflow', 'portfolio-startups']);
     panelOrder.forEach((key: string) => {
+      if (startupOnlyPanels.has(key)) return;
       const panel = this.ctx.panels[key];
       if (panel) {
         const el = panel.getElement();
